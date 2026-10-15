@@ -93,7 +93,9 @@ details.panel>summary{margin-top:0}
       <a class="btn primary" id="pkCal2" href="#" target="_blank" rel="noopener">Avviso ore 21:00 del giorno prima</a>
       <button class="primary" id="pkIcs" hidden>Aggiungi gli avvisi al Calendario</button>
       <a class="btn" id="pkMap" href="#" target="_blank" rel="noopener" hidden>Ritrova l'auto</a>
+      <button id="pkIcsDirect" hidden>Prova diretta: apri nel Calendario</button>
       <button id="pkClear">Ho spostato l'auto</button>
+      <button id="pkClearDirect" hidden>Prova diretta: annulla nel Calendario</button>
       <button id="pkClearOnly" hidden>Solo dimentica il parcheggio (lascia gli eventi)</button>
     </div>
     <p class="small muted" id="pkHint"></p>
@@ -363,7 +365,7 @@ $('btnSave').addEventListener('click',()=>{
   persist(); $('pick').hidden=true; $('results').innerHTML=''; $('q').value=''; say('');
   renderParked(); window.scrollTo({top:0,behavior:'smooth'});
 });
-function icsFile(evs,cancel,text){
+function icsText(evs,cancel,text){
   const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Pulizia Strade Firenze//IT','CALSCALE:GREGORIAN','METHOD:'+(cancel?'CANCEL':'PUBLISH')];
   evs.forEach(o=>{
     const s=new Date(o.s), e=new Date(o.e);
@@ -375,8 +377,11 @@ function icsFile(evs,cancel,text){
     L.push('END:VEVENT');
   });
   L.push('END:VCALENDAR');
-  return new File([L.join('\r\n')],cancel?'annulla-pulizia-strada.ics':'pulizia-strada.ics',{type:'text/calendar'});
+  return L.join('\r\n');
 }
+function icsFile(evs,cancel,text){return new File([icsText(evs,cancel,text)],cancel?'annulla-pulizia-strada.ics':'pulizia-strada.ics',{type:'text/calendar'});}
+/* Prova diretta: link a un indirizzo data:text/calendar. Su Safari dell'iPhone dovrebbe aprire subito la schermata di aggiunta al Calendario, senza passare da File. Non verificato su iOS 27. */
+function openDirect(txt){const l=document.createElement('a'); l.href='data:text/calendar;charset=utf-8,'+encodeURIComponent(txt); l.target='_blank'; l.rel='noopener'; document.body.append(l); l.click(); l.remove();}
 function shareFile(file,text,done){
   const fallback=()=>{const u=URL.createObjectURL(file); const l=document.createElement('a'); l.href=u; l.download=file.name; document.body.append(l); l.click(); l.remove(); if(done) done();};
   if(navigator.canShare&&navigator.canShare({files:[file]})) navigator.share({files:[file],title:text}).then(()=>{if(done) done();}).catch(e=>{if(e&&e.name!=='AbortError') fallback();});
@@ -387,6 +392,11 @@ $('pkClear').addEventListener('click',()=>{
     const text='Pulizia strada, sposta l\'auto: '+(saved.street||'');
     shareFile(icsFile(saved.cal,true,text),text,()=>{saved=null;persist();renderParked();});
   } else {saved=null;persist();renderParked();}
+});
+$('pkClearDirect').addEventListener('click',()=>{
+  if(!(saved&&saved.cal&&saved.cal.length)) return;
+  openDirect(icsText(saved.cal,true,'Pulizia strada, sposta l\'auto: '+(saved.street||'')));
+  $('pkHint').textContent='Se si è aperta la schermata del Calendario, conferma. Poi tocca «Solo dimentica il parcheggio».';
 });
 $('pkClearOnly').addEventListener('click',()=>{saved=null;persist();renderParked();});
 
@@ -399,7 +409,7 @@ function renderParked(){
   const mp=$('pkMap'); mp.hidden=!(saved.lat&&saved.lon); if(!mp.hidden) mp.href='https://maps.apple.com/?daddr='+saved.lat+','+saved.lon+'&dirflg=w';
   const rules=saved.rules.map(i=>D.r[i]), now=new Date(), oc=occurrences(rules,now,4);
   const st=$('pkState'), ul=$('pkDates'); ul.innerHTML='';
-  if(!oc.length){st.className='state good';st.textContent='Nessun divieto in programma';$('pkCal1').hidden=true;$('pkCal2').hidden=true;$('pkIcs').hidden=true;$('pkHint').textContent='';$('pkClearOnly').hidden=true;$('pkClear').textContent='Ho spostato l\'auto';return;}
+  if(!oc.length){st.className='state good';st.textContent='Nessun divieto in programma';$('pkCal1').hidden=true;$('pkCal2').hidden=true;$('pkIcs').hidden=true;$('pkIcsDirect').hidden=true;$('pkClearDirect').hidden=true;$('pkHint').textContent='';$('pkClearOnly').hidden=true;$('pkClear').textContent='Ho spostato l\'auto';return;}
   const n=oc[0], inCorso=n.start<=now, ms=n.start-now;
   if(inCorso){st.className='state bad';st.textContent='Divieto in corso fino alle '+hhmm(n.end.getHours()*60+n.end.getMinutes());}
   else if(ms<=24*36e5){st.className='state bad';st.textContent='Sposta l\'auto entro '+human(ms);}
@@ -414,20 +424,25 @@ function renderParked(){
   [['pkCal1',al[0]],['pkCal2',al[1]]].forEach(([id,x])=>{
     const el=$(id); el.hidden=x.at<=now||!window.claude; if(!el.hidden) el.href=gl(x.at);
   });
-  $('pkHint').textContent=dis?('Avvisi previsti: '+dis+(window.claude?'. Ogni pulsante crea un evento a quell\'ora.':'. Tocca «Aggiungi gli avvisi al Calendario»: per ogni divieto si crea un evento con due promemoria (48 ore prima e ore 21:00 del giorno prima). Si apre il foglio di condivisione: scegli Calendario e conferma.')):'Gli orari degli avvisi sono già passati: controlla subito il divieto.';
+  $('pkHint').textContent=dis?('Avvisi previsti: '+dis+(window.claude?'. Ogni pulsante crea un evento a quell\'ora.':'. Passi: 1) tocca «Aggiungi gli avvisi al Calendario»; 2) nel foglio che si apre scegli «Salva su File» (cartella a piacere); 3) apri l\'app File, tocca il file «pulizia-strada.ics» e poi «Aggiungi tutto». Per ogni divieto si crea un evento con due promemoria (48 ore prima e ore 21:00 del giorno prima). Se il Calendario chiede in quale calendario inserirli, scegline uno solo per questi eventi, così potrai eliminarli tutti insieme.')):'Gli orari degli avvisi sono già passati: controlla subito il divieto.';
   const ics=$('pkIcs');
   ics.hidden=!!window.claude||!dis;
+  $('pkIcsDirect').hidden=ics.hidden;
   const hasCal=!!(saved.cal&&saved.cal.length);
-  $('pkClear').textContent=hasCal?'Ho spostato l\'auto: annulla gli eventi':'Ho spostato l\'auto';
+  $('pkClearDirect').hidden=!hasCal||!!window.claude;
+  $('pkClear').textContent=hasCal?'Ho spostato l\'auto: file di annullamento':'Ho spostato l\'auto';
   $('pkClearOnly').hidden=!hasCal;
-  ics.onclick=()=>{
+  if(hasCal&&!window.claude) $('pkHint').textContent+=' Quando sposti l\'auto: tocca «Ho spostato l\'auto: file di annullamento», salvalo su File e aprilo come prima. Se gli eventi restano nel Calendario, cercali con il titolo «Pulizia strada» ed eliminali a mano.';
+  const buildEvs=()=>{
     const evs=[];
     oc.forEach(o=>{
       const alarms=alertTimes(o.start).filter(x=>x.at>now); if(!alarms.length) return;
       evs.push({s:o.start.getTime(),e:o.end.getTime(),l:saved.street||'',m:alarms.map(x=>Math.round((o.start-x.at)/6e4))});
     });
-    saved.cal=evs.map(x=>({s:x.s,e:x.e,l:x.l})); persist();
-    shareFile(icsFile(evs,false,text),text,()=>renderParked());
+    saved.cal=evs.map(x=>({s:x.s,e:x.e,l:x.l})); persist(); return evs;
+  };
+  $('pkIcsDirect').onclick=()=>{const evs=buildEvs(); $('pkClearDirect').hidden=false; $('pkClearOnly').hidden=false; $('pkClear').textContent='Ho spostato l\'auto: file di annullamento'; openDirect(icsText(evs,false,text)); $('pkHint').textContent='Se si è aperta la schermata del Calendario, tocca «Aggiungi tutto». Se non è successo nulla, usa il pulsante «Aggiungi gli avvisi al Calendario».';};
+  ics.onclick=()=>{const evs=buildEvs(); shareFile(icsFile(evs,false,text),text,()=>renderParked());
   };
 }
 load(); renderParked();
