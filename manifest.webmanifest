@@ -1,16 +1,28 @@
 {
-  "name": "Pulizia Strade Firenze",
-  "short_name": "Pulizia Strade",
-  "description": "Salva dove hai parcheggiato e controlla i divieti di sosta per la pulizia strade a Firenze.",
-  "lang": "it",
+  "name": "Pulizia Strade App",
+  "short_name": "PuliziaStrade",
+  "description": "Aggiungi velocemente i divieti di sosta per pulizia strade al calendario del tuo iPhone",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#eef1f4",
-  "theme_color": "#1d4f91",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
   "icons": [
-    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
-    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png"},
-    {"src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
